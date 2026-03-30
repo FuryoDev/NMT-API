@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+starlette
+
+torch
+transformers
+sentencepiece
+accelerate
+
+sentence-transformers
+faiss-cpu
