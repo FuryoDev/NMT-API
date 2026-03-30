@@ -6,11 +6,11 @@ namespace NMT_api
     internal static class Config
     {
         internal static ApplicationInfo Application = new(
-            "TODOX - The group to which belongs the application (ESB, Video, Audio, AI, Monitoring, etc.)",
-            "TODOX - The application name",
-            SharedGetter.GetInstance_API(SharedGetter.GetHost()), // TODOX - The Primary Key of the application is the couple [Name + Instance]
-            "TODOX - The description of the application",
-            "v1.0.1"); // TODOX - The version (not the same as the Assembly Version)
+            "AI",
+            "NMT API",
+            SharedGetter.GetInstance_API(SharedGetter.GetHost()), // The Primary Key of the application is the couple [Name + Instance]
+            "Neural machine translation API (text, files, and SRT subtitles).",
+            "v1.0.1");
         internal static class Related
         {
             internal static readonly List<Application> Applications =
@@ -27,7 +27,7 @@ namespace NMT_api
         internal static class Security
         {
             internal static readonly string Issuer = Application.Name;
-            private const string SecretKey_Application = "TODOX_SecretKey";
+            private const string SecretKey_Application = "NMT_API_SecretKey";
             internal static readonly string SecretKey_Instance = SharedGetter.GetUniqueSecretKey(SecretKey_Application, Issuer);
         }
     }
