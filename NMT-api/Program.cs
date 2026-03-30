@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.OpenApi;
+using NMT_api.Services.Srt;
+using NMT_api.Services.Translation;
 using Scalar.AspNetCore;
 using Serilog;
 using System.Net;
@@ -74,11 +76,12 @@ namespace NMT_api
                 {
                     options.AllowEmptyInputInBodyModelBinding = true;
                     options.InputFormatters.Insert(0, new PlainTextInputFormatter());
-                });
-                _ = builder.Services.AddControllers().AddJsonOptions(a =>
+                }).AddJsonOptions(a =>
                 {
                     a.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
                 });
+                _ = builder.Services.AddSingleton<INmtTranslationService, NllbTranslationService>();
+                _ = builder.Services.AddScoped<ISrtTranslationService, SrtTranslationService>();
 
                 // Tell .NET to scan the controllers, routes, and DTOs to build the internal "map" of the API
                 //  - Provide the metadata for Scalar
