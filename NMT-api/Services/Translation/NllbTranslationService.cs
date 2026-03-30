@@ -1,11 +1,11 @@
 using System.Diagnostics;
+using NMT_api.Services.Translation.Configuration;
+using NMT_api.Services.Translation.Onnx;
 
 namespace NMT_api.Services.Translation;
 
 public class NllbTranslationService : INmtTranslationService
 {
-    public const string DefaultModelName = "facebook/nllb-200-distilled-600M";
-
     private static readonly IReadOnlyDictionary<string, string> LanguageMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["fr"] = "fra_Latn",
@@ -17,18 +17,27 @@ public class NllbTranslationService : INmtTranslationService
         ["it"] = "ita_Latn"
     };
 
+    private readonly ITranslationTokenizer _tokenizer;
+    private readonly IOnnxNllbRunner _onnxRunner;
+    private readonly NllbOnnxOptions _options;
+
     public string ModelName { get; }
     public string Device { get; }
     public int StartupMs { get; }
 
-    public NllbTranslationService()
+    public NllbTranslationService(
+        IConfiguration configuration,
+        ITranslationTokenizer tokenizer,
+        IOnnxNllbRunner onnxRunner)
     {
         Stopwatch sw = Stopwatch.StartNew();
 
-        ModelName = DefaultModelName;
-        Device = "cpu";
+        _options = configuration.GetSection(NllbOnnxOptions.SectionName).Get<NllbOnnxOptions>() ?? new NllbOnnxOptions();
+        _tokenizer = tokenizer;
+        _onnxRunner = onnxRunner;
 
-        // TODO: brancher ici une implémentation .NET du modèle NLLB (ONNX/Transformers).
+        ModelName = _options.ModelName;
+        Device = _onnxRunner.RuntimeDevice;
         StartupMs = (int)sw.ElapsedMilliseconds;
     }
 
@@ -45,19 +54,40 @@ public class NllbTranslationService : INmtTranslationService
         int maxNewTokens = 256,
         int numBeams = 4)
     {
-        _ = maxNewTokens;
-        _ = numBeams;
-
         Stopwatch sw = Stopwatch.StartNew();
+
         string source = NormalizeLanguage(sourceLanguage);
         string target = NormalizeLanguage(targetLanguage);
+        string cleanText = (text ?? string.Empty).Trim();
 
-        // TODO: remplacer ce fallback par une vraie traduction du modèle.
-        string translated = (text ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(cleanText))
+        {
+            return new TranslationResult
+            {
+                TranslatedText = string.Empty,
+                SourceLanguage = source,
+                TargetLanguage = target,
+                Device = Device,
+                DurationMs = (int)sw.ElapsedMilliseconds
+            };
+        }
+
+        int[] inputIds = _tokenizer.Encode(cleanText, source, _options.MaxInputTokens);
+        int forcedBosTokenId = _tokenizer.ResolveForcedBosTokenId(target);
+
+        IReadOnlyList<int> outputIds = _onnxRunner.Generate(
+            inputIds,
+            forcedBosTokenId,
+            maxNewTokens > 0 ? maxNewTokens : _options.DefaultMaxNewTokens,
+            numBeams > 0 ? numBeams : _options.DefaultNumBeams,
+            _options.NoRepeatNgramSize,
+            _options.RepetitionPenalty);
+
+        string translated = _tokenizer.Decode(outputIds);
 
         return new TranslationResult
         {
-            TranslatedText = translated,
+            TranslatedText = string.IsNullOrWhiteSpace(translated) ? cleanText : translated,
             SourceLanguage = source,
             TargetLanguage = target,
             Device = Device,
