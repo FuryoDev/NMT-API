@@ -1,11 +1,12 @@
 using System.Diagnostics;
+using NMT_api.Services.Translation.Configuration;
+using NMT_api.Services.Translation.PythonBridge;
+using NMT_api.Services.Translation.PythonBridge.Contracts;
 
 namespace NMT_api.Services.Translation;
 
 public class NllbTranslationService : INmtTranslationService
 {
-    public const string DefaultModelName = "facebook/nllb-200-distilled-600M";
-
     private static readonly IReadOnlyDictionary<string, string> LanguageMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["fr"] = "fra_Latn",
@@ -17,19 +18,41 @@ public class NllbTranslationService : INmtTranslationService
         ["it"] = "ita_Latn"
     };
 
+    private readonly IPythonTranslationBackendClient _pythonClient;
+
     public string ModelName { get; }
     public string Device { get; }
     public int StartupMs { get; }
 
-    public NllbTranslationService()
+    public NllbTranslationService(
+        IConfiguration configuration,
+        IPythonTranslationBackendClient pythonClient,
+        ILogger<NllbTranslationService> logger)
     {
         Stopwatch sw = Stopwatch.StartNew();
+        _pythonClient = pythonClient;
 
-        ModelName = DefaultModelName;
-        Device = "cpu";
+        PythonTranslationBackendOptions options = configuration
+            .GetSection(PythonTranslationBackendOptions.SectionName)
+            .Get<PythonTranslationBackendOptions>()
+            ?? new PythonTranslationBackendOptions();
 
-        // TODO: brancher ici une implémentation .NET du modèle NLLB (ONNX/Transformers).
-        StartupMs = (int)sw.ElapsedMilliseconds;
+        using CancellationTokenSource healthTimeout = new(TimeSpan.FromSeconds(options.StartupHealthCheckTimeoutSeconds));
+        try
+        {
+            PythonHealthResponse? health = _pythonClient.GetHealthAsync(healthTimeout.Token).GetAwaiter().GetResult();
+
+            ModelName = !string.IsNullOrWhiteSpace(health?.Model) ? health.Model : options.FallbackModelName;
+            Device = !string.IsNullOrWhiteSpace(health?.Device) ? health.Device : options.FallbackDevice;
+            StartupMs = health?.StartupMs > 0 ? health.StartupMs : (int)sw.ElapsedMilliseconds;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Python backend health check failed at startup. Fallback monitoring values are used.");
+            ModelName = options.FallbackModelName;
+            Device = options.FallbackDevice;
+            StartupMs = (int)sw.ElapsedMilliseconds;
+        }
     }
 
     public string NormalizeLanguage(string language)
@@ -45,23 +68,44 @@ public class NllbTranslationService : INmtTranslationService
         int maxNewTokens = 256,
         int numBeams = 4)
     {
-        _ = maxNewTokens;
-        _ = numBeams;
-
         Stopwatch sw = Stopwatch.StartNew();
+
+        string normalizedText = (text ?? string.Empty).Trim();
         string source = NormalizeLanguage(sourceLanguage);
         string target = NormalizeLanguage(targetLanguage);
 
-        // TODO: remplacer ce fallback par une vraie traduction du modèle.
-        string translated = (text ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalizedText))
+        {
+            return new TranslationResult
+            {
+                TranslatedText = string.Empty,
+                SourceLanguage = source,
+                TargetLanguage = target,
+                Device = Device,
+                DurationMs = (int)sw.ElapsedMilliseconds
+            };
+        }
+
+        PythonTranslateResponse response = _pythonClient.TranslateAsync(
+            new PythonTranslateRequest
+            {
+                Text = normalizedText,
+                SourceLanguage = source,
+                TargetLanguage = target,
+                MaxNewTokens = maxNewTokens,
+                NumBeams = numBeams,
+                Chunking = false,
+                Preprocess = false
+            },
+            CancellationToken.None).GetAwaiter().GetResult();
 
         return new TranslationResult
         {
-            TranslatedText = translated,
+            TranslatedText = response.TranslatedText,
             SourceLanguage = source,
             TargetLanguage = target,
-            Device = Device,
-            DurationMs = (int)sw.ElapsedMilliseconds
+            Device = string.IsNullOrWhiteSpace(response.Device) ? Device : response.Device,
+            DurationMs = response.DurationMs > 0 ? response.DurationMs : (int)sw.ElapsedMilliseconds
         };
     }
 }
