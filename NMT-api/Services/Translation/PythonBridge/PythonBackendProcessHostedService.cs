@@ -19,7 +19,7 @@ public sealed class PythonBackendProcessHostedService(
             return;
         }
 
-        string workingDirectory = Path.GetFullPath(settings.AutoStartWorkingDirectory, AppContext.BaseDirectory);
+        string workingDirectory = Path.GetFullPath(settings.AutoStartWorkingDirectory, environment.ContentRootPath);
         if (!Directory.Exists(workingDirectory))
         {
             logger.LogWarning("Python auto-start skipped. Working directory not found: {WorkingDirectory}", workingDirectory);
