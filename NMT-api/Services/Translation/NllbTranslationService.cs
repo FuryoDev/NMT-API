@@ -122,6 +122,18 @@ public class NllbTranslationService : INmtTranslationService
             };
         }
 
+        if (string.IsNullOrWhiteSpace(normalizedText))
+        {
+            return new TranslationResult
+            {
+                TranslatedText = string.Empty,
+                SourceLanguage = source,
+                TargetLanguage = target,
+                Device = Device,
+                DurationMs = (int)sw.ElapsedMilliseconds
+            };
+        }
+
         PythonTranslateResponse response = _pythonClient.TranslateAsync(
             new PythonTranslateRequest
             {
