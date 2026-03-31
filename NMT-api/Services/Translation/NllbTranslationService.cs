@@ -73,6 +73,54 @@ public class NllbTranslationService : INmtTranslationService
         string normalizedText = (text ?? string.Empty).Trim();
         string source = NormalizeLanguage(sourceLanguage);
         string target = NormalizeLanguage(targetLanguage);
+        string cleanText = (text ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(cleanText))
+        {
+            return new TranslationResult
+            {
+                TranslatedText = string.Empty,
+                SourceLanguage = source,
+                TargetLanguage = target,
+                Device = Device,
+                DurationMs = (int)sw.ElapsedMilliseconds
+            };
+        }
+
+        int[] inputIds = _tokenizer.Encode(cleanText, source, _options.MaxInputTokens);
+        int forcedBosTokenId = _tokenizer.ResolveForcedBosTokenId(target);
+
+        IReadOnlyList<int> outputIds = _onnxRunner.Generate(
+            inputIds,
+            forcedBosTokenId,
+            maxNewTokens > 0 ? maxNewTokens : _options.DefaultMaxNewTokens,
+            numBeams > 0 ? numBeams : _options.DefaultNumBeams,
+            _options.NoRepeatNgramSize,
+            _options.RepetitionPenalty);
+
+        if (string.IsNullOrWhiteSpace(normalizedText))
+        {
+            return new TranslationResult
+            {
+                TranslatedText = string.Empty,
+                SourceLanguage = source,
+                TargetLanguage = target,
+                Device = Device,
+                DurationMs = (int)sw.ElapsedMilliseconds
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedText))
+        {
+            return new TranslationResult
+            {
+                TranslatedText = string.Empty,
+                SourceLanguage = source,
+                TargetLanguage = target,
+                Device = Device,
+                DurationMs = (int)sw.ElapsedMilliseconds
+            };
+        }
 
         if (string.IsNullOrWhiteSpace(normalizedText))
         {
