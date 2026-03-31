@@ -91,6 +91,7 @@ namespace NMT_api
                     client.BaseAddress = new Uri(backendOptions.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(backendOptions.TimeoutSeconds);
                 });
+                _ = builder.Services.AddHostedService<PythonBackendProcessHostedService>();
                 _ = builder.Services.AddSingleton<INmtTranslationService, NllbTranslationService>();
                 _ = builder.Services.AddScoped<ISrtTranslationService, SrtTranslationService>();
 

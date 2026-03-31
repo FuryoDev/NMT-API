@@ -21,6 +21,7 @@ La façade officielle reste l'API ASP.NET Core (.NET 10). La traduction réelle 
 
 4. **`PythonTranslationBackendOptions`**
    - configuration via `appsettings` (`BaseUrl`, timeouts, fallback monitoring).
+   - mode de confort en dev: auto-start du backend Python depuis le run .NET.
 
 ## Répartition des responsabilités
 
@@ -45,6 +46,7 @@ La façade officielle reste l'API ASP.NET Core (.NET 10). La traduction réelle 
 - `NllbTranslationService` appelle `/translate` du backend Python ;
 - propriétés de monitoring récupérées via `/health` au démarrage ;
 - controllers inchangés.
+- en environnement Development, le backend Python peut être auto-démarré depuis l'API .NET.
 
 ### Étape 2 — Durcissement prod
 
