@@ -12,6 +12,8 @@ using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.OpenApi;
 using NMT_api.Services.Srt;
+using NMT_api.Services.Translation.Configuration;
+using NMT_api.Services.Translation.PythonBridge;
 using NMT_api.Services.Translation;
 using Scalar.AspNetCore;
 using Serilog;
@@ -79,6 +81,15 @@ namespace NMT_api
                 }).AddJsonOptions(a =>
                 {
                     a.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                });
+                PythonTranslationBackendOptions backendOptions = builder.Configuration
+                    .GetSection(PythonTranslationBackendOptions.SectionName)
+                    .Get<PythonTranslationBackendOptions>() ?? new PythonTranslationBackendOptions();
+                _ = builder.Services.Configure<PythonTranslationBackendOptions>(builder.Configuration.GetSection(PythonTranslationBackendOptions.SectionName));
+                _ = builder.Services.AddHttpClient<IPythonTranslationBackendClient, PythonTranslationBackendClient>(client =>
+                {
+                    client.BaseAddress = new Uri(backendOptions.BaseUrl);
+                    client.Timeout = TimeSpan.FromSeconds(backendOptions.TimeoutSeconds);
                 });
                 _ = builder.Services.AddSingleton<INmtTranslationService, NllbTranslationService>();
                 _ = builder.Services.AddScoped<ISrtTranslationService, SrtTranslationService>();
