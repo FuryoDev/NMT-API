@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using NMT_api.Contracts.Requests;
 using NMT_api.Models.Translation;
 using NMT_api.Services.Translation.PythonBridge;
+using NMT_api.Services.Translation.PythonBridge.Contracts;
 
 namespace NMT_api.Controllers;
 
@@ -26,7 +27,7 @@ public class TranslationController(IPythonTranslationBackendClient pythonBackend
     [HttpGet("health")]
     public async Task<ActionResult<HealthResponse>> Health(CancellationToken cancellationToken)
     {
-        PythonBridge.Contracts.PythonHealthResponse? health = await pythonBackendClient.GetHealthAsync(cancellationToken);
+        PythonHealthResponse? health = await pythonBackendClient.GetHealthAsync(cancellationToken);
         if (health is null)
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Python backend is unreachable.");
@@ -42,7 +43,7 @@ public class TranslationController(IPythonTranslationBackendClient pythonBackend
     }
 
     [HttpPost("translate")]
-    public async Task<ActionResult<PythonBridge.Contracts.PythonTranslateResponse>> Translate([FromBody] TranslateRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<PythonTranslateResponse>> Translate([FromBody] TranslateRequest request, CancellationToken cancellationToken)
     {
         string text = (request.Text ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(text))
@@ -51,7 +52,7 @@ public class TranslationController(IPythonTranslationBackendClient pythonBackend
         }
 
         request.Text = text;
-        PythonBridge.Contracts.PythonTranslateResponse translation = await pythonBackendClient.TranslateAsync(request, cancellationToken);
+        PythonTranslateResponse translation = await pythonBackendClient.TranslateAsync(request, cancellationToken);
         return Ok(translation);
     }
 
@@ -71,14 +72,14 @@ public class TranslationController(IPythonTranslationBackendClient pythonBackend
 
     [HttpPost("translate/file/json")]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<PythonBridge.Contracts.PythonTranslateResponse>> TranslateFileJson([FromForm] TranslateFileJsonRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<PythonTranslateResponse>> TranslateFileJson([FromForm] TranslateFileJsonRequest request, CancellationToken cancellationToken)
     {
         if (request.File is null || request.File.Length == 0)
         {
             return BadRequest("A non-empty file is required.");
         }
 
-        PythonBridge.Contracts.PythonTranslateResponse translation = await pythonBackendClient.TranslateFileJsonAsync(request, cancellationToken);
+        PythonTranslateResponse translation = await pythonBackendClient.TranslateFileJsonAsync(request, cancellationToken);
         return Ok(translation);
     }
 
