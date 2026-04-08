@@ -11,10 +11,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.OpenApi;
-using NMT_api.Services.Srt;
 using NMT_api.Services.Translation.Configuration;
 using NMT_api.Services.Translation.PythonBridge;
-using NMT_api.Services.Translation;
 using Scalar.AspNetCore;
 using Serilog;
 using System.Net;
@@ -94,9 +92,6 @@ namespace NMT_api
                     client.BaseAddress = new Uri(backendOptions.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(backendOptions.TimeoutSeconds);
                 });
-                _ = builder.Services.AddHostedService<PythonBackendProcessHostedService>();
-                _ = builder.Services.AddSingleton<INmtTranslationService, NllbTranslationService>();
-                _ = builder.Services.AddScoped<ISrtTranslationService, SrtTranslationService>();
 
                 // Tell .NET to scan the controllers, routes, and DTOs to build the internal "map" of the API
                 //  - Provide the metadata for Scalar
