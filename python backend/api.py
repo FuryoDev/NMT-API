@@ -166,7 +166,7 @@ async def translate_file(
         maxNewTokens,
         numBeams,
     )
-    return out["translatedText"]
+    return res.translated_txt
 
 # ---------- A) Translate file (JSON response) ----------
 @app.post("/translate/file/json")
