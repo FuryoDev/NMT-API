@@ -47,7 +47,10 @@ namespace NMT_api
                 });
 
                 // Specify the URLs the hosted application will listen on (No args -> From appsettings.json/launchSettings.json)
-                bool enableSecurity = Config.Application.IsEndpointSecurized.Value;
+                
+                //bool enableSecurity = Config.Application.IsEndpointSecurized.Value;
+                bool enableSecurity = false;
+
                 if (FlowEnvironments.IsDevelopment(SharedConfig.Environment))
                 {
                     enableSecurity = false;

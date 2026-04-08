@@ -1,10 +1,11 @@
-﻿﻿{
+﻿{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
     "Kestrel Development": {
       "commandName": "Project",
       "launchBrowser": true,
       "launchUrl": "index.html",
-      "applicationUrl": "http://localhost:777/",
+      "applicationUrl": "http://localhost:777",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
@@ -24,6 +25,5 @@
       },
       "dotnetRunMessages": true
     }
-  },
-  "$schema": "http://json.schemastore.org/launchsettings.json"
+  }
 }
