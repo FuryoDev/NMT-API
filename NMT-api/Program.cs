@@ -7,6 +7,7 @@ using Library_Common;
 using Library_Common.SharedConnectors;
 using Library_Logger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Hosting.WindowsServices;
@@ -23,6 +24,8 @@ namespace NMT_api
 {
     public class Program
     {
+        private const long MaxRequestBodySizeBytes = 25 * 1024 * 1024;
+
         public static void Main(string[] args)
         {
             try
@@ -42,6 +45,7 @@ namespace NMT_api
                 _ = builder.WebHost.ConfigureKestrel(options =>
                 {
                     options.AddServerHeader = false;
+                    options.Limits.MaxRequestBodySize = MaxRequestBodySizeBytes;
                 });
 
                 // Specify the URLs the hosted application will listen on (No args -> From appsettings.json/launchSettings.json)
@@ -82,6 +86,12 @@ namespace NMT_api
                 }).AddJsonOptions(a =>
                 {
                     a.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                });
+                _ = builder.Services.Configure<FormOptions>(options =>
+                {
+                    options.MultipartBodyLengthLimit = MaxRequestBodySizeBytes;
+                    options.ValueLengthLimit = int.MaxValue;
+                    options.MultipartHeadersLengthLimit = int.MaxValue;
                 });
                 PythonTranslationBackendOptions backendOptions = builder.Configuration
                     .GetSection(PythonTranslationBackendOptions.SectionName)
