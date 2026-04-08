@@ -1,23 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
 using NMT_api.Contracts.Requests;
 using NMT_api.Models.Translation;
-using NMT_api.Services.Srt;
-using NMT_api.Services.Translation;
+using NMT_api.Services.Translation.PythonBridge;
 
 namespace NMT_api.Controllers;
 
 [ApiController]
 [Route("")]
-public class TranslationController(
-    INmtTranslationService translator,
-    ISrtTranslationService srtTranslationService) : ControllerBase
+public class TranslationController(IPythonTranslationBackendClient pythonBackendClient) : ControllerBase
 {
     [HttpGet]
     public IActionResult Root()
     {
         return Ok(new
         {
-            message = "NLLB Translator API is running",
+            message = "NMT .NET gateway is running",
             health = "/health",
             translate = "/translate",
             translateFile = "/translate/file",
@@ -27,19 +24,25 @@ public class TranslationController(
     }
 
     [HttpGet("health")]
-    public ActionResult<HealthResponse> Health()
+    public async Task<ActionResult<HealthResponse>> Health(CancellationToken cancellationToken)
     {
+        PythonBridge.Contracts.PythonHealthResponse? health = await pythonBackendClient.GetHealthAsync(cancellationToken);
+        if (health is null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Python backend is unreachable.");
+        }
+
         return Ok(new HealthResponse
         {
-            Status = "ok",
-            Device = translator.Device,
-            StartupMs = translator.StartupMs,
-            Model = translator.ModelName
+            Status = health.Status,
+            Device = health.Device,
+            StartupMs = health.StartupMs,
+            Model = health.Model
         });
     }
 
     [HttpPost("translate")]
-    public ActionResult<TranslateResponse> Translate([FromBody] TranslateRequest request)
+    public async Task<ActionResult<PythonBridge.Contracts.PythonTranslateResponse>> Translate([FromBody] TranslateRequest request, CancellationToken cancellationToken)
     {
         string text = (request.Text ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(text))
@@ -47,103 +50,49 @@ public class TranslationController(
             return BadRequest("Text is required.");
         }
 
-        (string normalized, List<string> appliedRules) = request.Preprocess
-            ? TextPreprocessor.Normalize(text)
-            : (text, []);
-
-        TranslationResult translation = translator.Translate(
-            normalized,
-            request.SourceLanguage,
-            request.TargetLanguage,
-            request.MaxNewTokens,
-            request.NumBeams);
-
-        return Ok(new TranslateResponse
-        {
-            TranslatedText = translation.TranslatedText,
-            Device = translation.Device,
-            DurationMs = translation.DurationMs,
-            Preprocessing = request.Preprocess ? appliedRules : null
-        });
+        request.Text = text;
+        PythonBridge.Contracts.PythonTranslateResponse translation = await pythonBackendClient.TranslateAsync(request, cancellationToken);
+        return Ok(translation);
     }
 
     [HttpPost("translate/file")]
     [Consumes("multipart/form-data")]
     [Produces("text/plain")]
-    public async Task<IActionResult> TranslateFile([FromForm] TranslateFileRequest request)
+    public async Task<IActionResult> TranslateFile([FromForm] TranslateFileRequest request, CancellationToken cancellationToken)
     {
         if (request.File is null || request.File.Length == 0)
         {
             return BadRequest("A non-empty file is required.");
         }
 
-        using StreamReader reader = new(request.File.OpenReadStream());
-        string input = await reader.ReadToEndAsync();
-
-        (string normalized, _) = request.Preprocess ? TextPreprocessor.Normalize(input) : (input, []);
-
-        TranslationResult translation = translator.Translate(
-            normalized,
-            request.SourceLanguage,
-            request.TargetLanguage,
-            request.MaxNewTokens,
-            request.NumBeams);
-
-        return Content(translation.TranslatedText, "text/plain");
+        string translatedText = await pythonBackendClient.TranslateFileAsync(request, cancellationToken);
+        return Content(translatedText, "text/plain");
     }
 
     [HttpPost("translate/file/json")]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<TranslateResponse>> TranslateFileJson([FromForm] TranslateFileJsonRequest request)
+    public async Task<ActionResult<PythonBridge.Contracts.PythonTranslateResponse>> TranslateFileJson([FromForm] TranslateFileJsonRequest request, CancellationToken cancellationToken)
     {
         if (request.File is null || request.File.Length == 0)
         {
             return BadRequest("A non-empty file is required.");
         }
 
-        using StreamReader reader = new(request.File.OpenReadStream());
-        string input = await reader.ReadToEndAsync();
-
-        (string normalized, List<string> appliedRules) = request.Preprocess
-            ? TextPreprocessor.Normalize(input)
-            : (input, []);
-
-        TranslationResult translation = translator.Translate(
-            normalized,
-            request.SourceLanguage,
-            request.TargetLanguage,
-            request.MaxNewTokens,
-            request.NumBeams);
-
-        return Ok(new TranslateResponse
-        {
-            TranslatedText = translation.TranslatedText,
-            Device = translation.Device,
-            DurationMs = translation.DurationMs,
-            Preprocessing = request.Preprocess ? appliedRules : null
-        });
+        PythonBridge.Contracts.PythonTranslateResponse translation = await pythonBackendClient.TranslateFileJsonAsync(request, cancellationToken);
+        return Ok(translation);
     }
 
     [HttpPost("translate/srt")]
     [Consumes("multipart/form-data")]
     [Produces("text/plain")]
-    public async Task<IActionResult> TranslateSrt([FromForm] TranslateSrtRequest request)
+    public async Task<IActionResult> TranslateSrt([FromForm] TranslateSrtRequest request, CancellationToken cancellationToken)
     {
         if (request.File is null || request.File.Length == 0)
         {
             return BadRequest("A non-empty file is required.");
         }
 
-        using StreamReader reader = new(request.File.OpenReadStream());
-        string srtText = await reader.ReadToEndAsync();
-
-        string translatedSrt = srtTranslationService.TranslateSrt(
-            srtText,
-            request.SourceLanguage,
-            request.TargetLanguage,
-            request.MaxNewTokens,
-            request.NumBeams);
-
+        string translatedSrt = await pythonBackendClient.TranslateSrtAsync(request, cancellationToken);
         return Content(translatedSrt, "text/plain");
     }
 }
