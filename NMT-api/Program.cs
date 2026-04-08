@@ -7,14 +7,13 @@ using Library_Common;
 using Library_Common.SharedConnectors;
 using Library_Logger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.OpenApi;
-using NMT_api.Services.Srt;
 using NMT_api.Services.Translation.Configuration;
 using NMT_api.Services.Translation.PythonBridge;
-using NMT_api.Services.Translation;
 using Scalar.AspNetCore;
 using Serilog;
 using System.Net;
@@ -25,6 +24,8 @@ namespace NMT_api
 {
     public class Program
     {
+        private const long MaxRequestBodySizeBytes = 25 * 1024 * 1024;
+
         public static void Main(string[] args)
         {
             try
@@ -44,6 +45,7 @@ namespace NMT_api
                 _ = builder.WebHost.ConfigureKestrel(options =>
                 {
                     options.AddServerHeader = false;
+                    options.Limits.MaxRequestBodySize = MaxRequestBodySizeBytes;
                 });
 
                 // Specify the URLs the hosted application will listen on (No args -> From appsettings.json/launchSettings.json)
@@ -85,6 +87,12 @@ namespace NMT_api
                 {
                     a.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
                 });
+                _ = builder.Services.Configure<FormOptions>(options =>
+                {
+                    options.MultipartBodyLengthLimit = MaxRequestBodySizeBytes;
+                    options.ValueLengthLimit = int.MaxValue;
+                    options.MultipartHeadersLengthLimit = int.MaxValue;
+                });
                 PythonTranslationBackendOptions backendOptions = builder.Configuration
                     .GetSection(PythonTranslationBackendOptions.SectionName)
                     .Get<PythonTranslationBackendOptions>() ?? new PythonTranslationBackendOptions();
@@ -94,9 +102,6 @@ namespace NMT_api
                     client.BaseAddress = new Uri(backendOptions.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(backendOptions.TimeoutSeconds);
                 });
-                _ = builder.Services.AddHostedService<PythonBackendProcessHostedService>();
-                _ = builder.Services.AddSingleton<INmtTranslationService, NllbTranslationService>();
-                _ = builder.Services.AddScoped<ISrtTranslationService, SrtTranslationService>();
 
                 // Tell .NET to scan the controllers, routes, and DTOs to build the internal "map" of the API
                 //  - Provide the metadata for Scalar

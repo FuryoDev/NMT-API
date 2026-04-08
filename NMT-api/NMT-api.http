@@ -17,9 +17,8 @@ Content-Type: application/json
   "text": "Bonjour tout le monde",
   "sourceLanguage": "fr",
   "targetLanguage": "en",
-  "maxNewTokens": 256,
-  "numBeams": 4,
-  "preprocess": true
+  "maxNewTokens": 512,
+  "numBeams": 5
 }
 
 ###
