@@ -8,7 +8,6 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 from chunking import chunk_text, Chunk
-from preprocessing import normalize_text
 
 # -------------------------------------------------------------------
 # CONFIGURATION PRINCIPALE DU MODÈLE
@@ -92,10 +91,11 @@ class NllbTranslator:
             text: str,
             source_language: str,
             target_language: str,
-            max_new_tokens: int = 256,
-            num_beams: int = 4,
+            max_new_tokens: int = 512,
+            num_beams: int = 5,
             repetition_penalty: float = 1.15,
             no_repeat_ngram_size: int = 3,
+            max_new_tokens_ceiling: int = 2048,
     ) -> TranslationResult:
         """
         Paramètres importants :
@@ -143,14 +143,26 @@ class NllbTranslator:
         # - plus rapide,
         # - comportement normal pour un service de prédiction
         with torch.no_grad():
-            out_tokens = self.model.generate(
-                **inputs,
-                forced_bos_token_id=forced_bos_token_id,
-                max_new_tokens=max_new_tokens,
-                num_beams=num_beams,
-                repetition_penalty=repetition_penalty,
-                no_repeat_ngram_size=no_repeat_ngram_size,
-            )
+            current_max_new_tokens = max(1, max_new_tokens)
+
+            while True:
+                out_tokens = self.model.generate(
+                    **inputs,
+                    forced_bos_token_id=forced_bos_token_id,
+                    max_new_tokens=current_max_new_tokens,
+                    num_beams=num_beams,
+                    repetition_penalty=repetition_penalty,
+                    no_repeat_ngram_size=no_repeat_ngram_size,
+                )
+
+                generated_tokens_count = int(out_tokens.shape[-1])
+                hit_generation_limit = generated_tokens_count >= current_max_new_tokens
+                reached_ceiling = current_max_new_tokens >= max_new_tokens_ceiling
+
+                if not hit_generation_limit or reached_ceiling:
+                    break
+
+                current_max_new_tokens = min(current_max_new_tokens * 2, max_new_tokens_ceiling)
 
         # Convertit les tokens de sortie en texte humain lisible
         translated = self.tokenizer.batch_decode(out_tokens, skip_special_tokens=True)[0]
@@ -169,12 +181,11 @@ class NllbTranslator:
             text: str,
             source_language: str,
             target_language: str,
-            max_new_tokens: int = 256,
+            max_new_tokens: int = 512,
             max_chars: int = 900,
-            num_beams: int = 4,
+            num_beams: int = 5,
             preserve_paragraphs: bool = True,
             debug: bool = True,
-            preprocess: bool = True,
     ) -> Dict[str, Any]:
         """
         Traduit un texte long en plusieurs étapes.
@@ -201,18 +212,11 @@ class NllbTranslator:
         - max_chars : taille maximale d’un chunk
         - preserve_paragraphs : influence la manière de recoller les morceaux
         - debug : inclut des infos de diagnostic par chunk
-        - preprocess : active la normalisation textuelle avant traduction
         """
         t0 = time.time()
 
         original_text = (text or "").strip()
         text = original_text
-
-        # Cette liste enregistrera les règles de normalisation appliquées.
-        applied_rules: List[str] = []
-
-        if preprocess:
-            text, applied_rules = normalize_text(text)
 
         # Découpage du texte en chunks.
         chunks: List[Chunk] = chunk_text(text, max_chars=max_chars)
@@ -265,6 +269,5 @@ class NllbTranslator:
         # Ajout des champs debugs
         if debug:
             out["chunks"] = debug_chunks
-            out["preprocessing"] = applied_rules
 
         return out

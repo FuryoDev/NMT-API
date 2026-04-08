@@ -28,14 +28,8 @@ class TranslateRequest(BaseModel):
     text: str = Field(..., min_length=1)
     sourceLanguage: str = "fr"
     targetLanguage: str = "en"
-    maxNewTokens: int = 256
-    numBeams: int = 4
-
-    chunking: bool = True
-    maxChars: int = 900
-    preserveParagraphs: bool = True
-    debug: bool = False
-    preprocess: bool = True
+    maxNewTokens: int = 512
+    numBeams: int = 5
 
 
 class TranslateResponse(BaseModel):
@@ -44,7 +38,6 @@ class TranslateResponse(BaseModel):
     durationMs: int
     chunkCount: int | None = None
     chunks: list[dict] | None = None
-    preprocessing: list[str] | None = None
 
 
 class RagAddResponse(BaseModel):
@@ -92,41 +85,19 @@ def health():
 # ---------- A) Translate text ----------
 @app.post("/translate", response_model=TranslateResponse)
 def translate(req: TranslateRequest):
-    if not req.chunking:
-        res = translator.translate(
-            req.text,
-            req.sourceLanguage,
-            req.targetLanguage,
-            max_new_tokens=req.maxNewTokens,
-            num_beams=req.numBeams,
-        )
-        return {
-            "translatedText": res.translated_txt,
-            "device": res.device,
-            "durationMs": res.duration_ms,
-            "chunkCount": 1,
-            "chunks": None,
-            "preprocessing": None,
-        }
-
-    out = translator.translate_long(
+    res = translator.translate(
         req.text,
         req.sourceLanguage,
         req.targetLanguage,
         max_new_tokens=req.maxNewTokens,
-        max_chars=req.maxChars,
         num_beams=req.numBeams,
-        preserve_paragraphs=req.preserveParagraphs,
-        debug=req.debug,
-        preprocess=req.preprocess,
     )
     return {
-        "translatedText": out["translatedText"],
-        "device": out["device"],
-        "durationMs": out["durationMs"],
-        "chunkCount": out["chunkCount"],
-        "chunks": out.get("chunks"),
-        "preprocessing": out.get("preprocessing"),
+        "translatedText": res.translated_txt,
+        "device": res.device,
+        "durationMs": res.duration_ms,
+        "chunkCount": 1,
+        "chunks": None,
     }
 
 # ---------- A) Translate file (plain text response) ----------
@@ -135,27 +106,20 @@ async def translate_file(
     file: UploadFile = File(...),
     sourceLanguage: str = "fr",
     targetLanguage: str = "en",
-    maxCharsPerChunk: int = 900,
-    maxNewTokens: int = 256,
-    numBeams: int = 4,
-    preserveParagraphs: bool = True,
-    preprocess: bool = True,
+    maxNewTokens: int = 512,
+    numBeams: int = 5,
 ):
     content = await file.read()
     text = content.decode("utf-8", errors="replace")
 
-    out = translator.translate_long(
+    res = translator.translate(
         text,
         sourceLanguage,
         targetLanguage,
         max_new_tokens=maxNewTokens,
-        max_chars=maxCharsPerChunk,
         num_beams=numBeams,
-        preserve_paragraphs=preserveParagraphs,
-        debug=False,
-        preprocess=preprocess,
     )
-    return out["translatedText"]
+    return res.translated_txt
 
 # ---------- A) Translate file (JSON response) ----------
 @app.post("/translate/file/json")
@@ -163,28 +127,26 @@ async def translate_file_json(
     file: UploadFile = File(...),
     sourceLanguage: str = "fr",
     targetLanguage: str = "en",
-    maxCharsPerChunk: int = 900,
-    maxNewTokens: int = 256,
-    numBeams: int = 4,
-    preserveParagraphs: bool = True,
-    debug: bool = True,
-    preprocess: bool = True,
+    maxNewTokens: int = 512,
+    numBeams: int = 5,
 ):
     content = await file.read()
     text = content.decode("utf-8", errors="replace")
 
-    out = translator.translate_long(
+    res = translator.translate(
         text,
         sourceLanguage,
         targetLanguage,
         max_new_tokens=maxNewTokens,
-        max_chars=maxCharsPerChunk,
         num_beams=numBeams,
-        preserve_paragraphs=preserveParagraphs,
-        debug=debug,
-        preprocess=preprocess,
     )
-    return out
+    return {
+        "translatedText": res.translated_txt,
+        "device": res.device,
+        "durationMs": res.duration_ms,
+        "chunkCount": 1,
+        "chunks": None,
+    }
 
 # ---------- A) Translate SRT ----------
 @app.post("/translate/srt", response_class=PlainTextResponse)
@@ -192,8 +154,8 @@ async def translate_srt_file(
     file: UploadFile = File(...),
     sourceLanguage: str = "fr",
     targetLanguage: str = "en",
-    maxNewTokens: int = 256,
-    numBeams: int = 4,
+    maxNewTokens: int = 512,
+    numBeams: int = 5,
 ):
     content = await file.read()
     srt_text = content.decode("utf-8", errors="replace")

@@ -34,7 +34,7 @@ public sealed class PythonTranslationBackendClient(HttpClient httpClient) : IPyt
 
     public async Task<string> TranslateFileAsync(TranslateFileRequest request, CancellationToken cancellationToken)
     {
-        using MultipartFormDataContent form = BuildFileRequest(request.File, request.SourceLanguage, request.TargetLanguage, request.MaxNewTokens, request.NumBeams, request.Preprocess);
+        using MultipartFormDataContent form = BuildFileRequest(request.File, request.SourceLanguage, request.TargetLanguage, request.MaxNewTokens, request.NumBeams);
         using HttpResponseMessage response = await httpClient.PostAsync("/translate/file", form, cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(cancellationToken);
@@ -42,7 +42,7 @@ public sealed class PythonTranslationBackendClient(HttpClient httpClient) : IPyt
 
     public async Task<PythonTranslateResponse> TranslateFileJsonAsync(TranslateFileJsonRequest request, CancellationToken cancellationToken)
     {
-        using MultipartFormDataContent form = BuildFileRequest(request.File, request.SourceLanguage, request.TargetLanguage, request.MaxNewTokens, request.NumBeams, request.Preprocess);
+        using MultipartFormDataContent form = BuildFileRequest(request.File, request.SourceLanguage, request.TargetLanguage, request.MaxNewTokens, request.NumBeams);
         using HttpResponseMessage response = await httpClient.PostAsync("/translate/file/json", form, cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -79,8 +79,7 @@ public sealed class PythonTranslationBackendClient(HttpClient httpClient) : IPyt
         string sourceLanguage,
         string targetLanguage,
         int maxNewTokens,
-        int numBeams,
-        bool preprocess)
+        int numBeams)
     {
         ArgumentNullException.ThrowIfNull(file);
 
@@ -93,7 +92,6 @@ public sealed class PythonTranslationBackendClient(HttpClient httpClient) : IPyt
         form.Add(new StringContent(targetLanguage), "targetLanguage");
         form.Add(new StringContent(maxNewTokens.ToString()), "maxNewTokens");
         form.Add(new StringContent(numBeams.ToString()), "numBeams");
-        form.Add(new StringContent(preprocess.ToString().ToLowerInvariant()), "preprocess");
 
         return form;
     }

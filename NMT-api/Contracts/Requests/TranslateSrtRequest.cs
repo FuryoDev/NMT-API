@@ -14,8 +14,8 @@ public class TranslateSrtRequest
     public string TargetLanguage { get; set; } = "en";
 
     [FromForm(Name = "maxNewTokens")]
-    public int MaxNewTokens { get; set; } = 256;
+    public int MaxNewTokens { get; set; } = 512;
 
     [FromForm(Name = "numBeams")]
-    public int NumBeams { get; set; } = 4;
+    public int NumBeams { get; set; } = 5;
 }

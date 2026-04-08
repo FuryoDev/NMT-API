@@ -160,9 +160,8 @@ def translate_srt(
         source_language: str,
         target_language: str,
         max_chars: int = 900,
-        max_new_tokens: int = 256,
-        num_beams: int = 4,
-        preprocess: bool = True,
+        max_new_tokens: int = 512,
+        num_beams: int = 5,
 ) -> str:
     """
     Traduit un fichier SRT entier tout en conservant sa structure.
@@ -185,10 +184,6 @@ def translate_srt(
     - On part du principe qu’un bloc SRT est généralement court.
     - Donc pas besoin de la logique complète de chunking long texte.
 
-    Note :
-    - Le paramètre preprocess est présent dans la signature,
-      mais dans cette version il n’est pas exploité directement ici.
-      Le comportement dépend donc entièrement de la méthode translator.translate().
     """
     blocks = parse_srt(srt_text)
     if not blocks:
