@@ -1,0 +1,119 @@
+# =====================================
+# ===== .NET / C# =====================
+# =====================================
+
+# Build
+bin/
+obj/
+out/
+
+# User / IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+artifacts/
+
+# Runtime / publish
+*.runtimeconfig.dev.json
+publish/
+
+# Tests
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# =====================================
+# ===== Python ========================
+# =====================================
+
+# Virtual env (IMPORTANT)
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs / temp
+*.log
+*.tmp
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python tools
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# =====================================
+# ===== Python backend spécifique =====
+# =====================================
+
+# Si ton dossier s'appelle EXACTEMENT comme ça
+python backend/venv/
+
+# (optionnel) si tu génères des fichiers
+python backend/output/
+python backend/temp/
+
+# =====================================
+# ===== Secrets / config ==============
+# =====================================
+
+# .NET
+appsettings.Development.json
+secrets.json
+
+# Python
+.env
+
+# =====================================
+# ===== Docker / infra ===============
+# =====================================
+
+# Override local uniquement
+docker-compose.override.yml
+
+# =====================================
+# ===== Misc ==========================
+# =====================================
+
+*.cache
+*.temp
