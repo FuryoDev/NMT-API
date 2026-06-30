@@ -3,8 +3,12 @@ namespace NMT_api.Services.Translation.Onnx;
 public sealed record OnnxModelInfo(
     string Provider,
     string ModelPath,
+    string TokenizerPath,
+    OnnxModelStatus Status,
     bool IsLoaded,
-    DateTimeOffset LoadedAt,
+    bool IsRequired,
+    DateTimeOffset? LoadedAt,
     int StartupMs,
     IReadOnlyCollection<string> InputNames,
-    IReadOnlyCollection<string> OutputNames);
+    IReadOnlyCollection<string> OutputNames,
+    string? Message);

@@ -7,41 +7,66 @@ namespace NMT_api.Services.Translation.Onnx;
 
 public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
 {
-    private readonly InferenceSession _session;
+    private readonly InferenceSession? _session;
     private readonly NllbOnnxOptions _options;
     private readonly string _modelPath;
-    private readonly DateTimeOffset _loadedAt;
+    private readonly string _tokenizerPath;
+    private readonly DateTimeOffset? _loadedAt;
     private readonly int _startupMs;
+    private readonly OnnxModelStatus _status;
+    private readonly string? _message;
 
     public OnnxNllbRunner(IOptions<NllbOnnxOptions> options)
     {
         _options = options.Value;
         _modelPath = ResolvePath(_options.ModelPath);
+        _tokenizerPath = ResolvePath(_options.TokenizerPath);
 
         if (!File.Exists(_modelPath))
         {
-            throw new FileNotFoundException($"The model file {_modelPath} does not exist.");
+            _status = OnnxModelStatus.Missing;
+            _message = $"The ONNX model file was not found: {_modelPath}";
+            return;
         }
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
-        _session = new InferenceSession(_modelPath);
-        stopwatch.Stop();
+        try
+        {
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            _session = new InferenceSession(_modelPath);
+            stopwatch.Stop();
 
-        _loadedAt = DateTimeOffset.UtcNow;
-        _startupMs = (int)stopwatch.ElapsedMilliseconds;
+            _loadedAt = DateTimeOffset.UtcNow;
+            _startupMs = (int)stopwatch.ElapsedMilliseconds;
+            _status = OnnxModelStatus.Loaded;
+            _message = "ONNX model loaded.";
+        }
+        catch (Exception ex)
+        {
+            _status = OnnxModelStatus.Failed;
+            _message = $"ONNX model loading failed: {ex.Message}";
+        }
     }
 
     public OnnxModelInfo ModelInfo => new(
         "ONNX Runtime",
         _modelPath,
-        IsLoaded: true,
+        _tokenizerPath,
+        _status,
+        IsLoaded: _session is not null,
+        IsRequired: _options.ModelRequired,
         _loadedAt,
         _startupMs,
-        _session.InputMetadata.Keys.Order().ToArray(),
-        _session.OutputMetadata.Keys.Order().ToArray());
+        _session?.InputMetadata.Keys.Order().ToArray() ?? [],
+        _session?.OutputMetadata.Keys.Order().ToArray() ?? [],
+        _message);
 
     public GreedyGenerationResult Generate(GreedyGenerationRequest request)
     {
+        if (_session is null)
+        {
+            throw new OnnxModelUnavailableException(_message ?? "ONNX model is not available.");
+        }
+
         if (request.InputIds.Length == 0)
             throw new ArgumentException("InputIds cannot be empty.");
 
@@ -88,6 +113,11 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
         long[] attentionMask,
         long[] decoderInputIds)
     {
+        if (_session is null)
+        {
+            throw new OnnxModelUnavailableException(_message ?? "ONNX model is not available.");
+        }
+
         DenseTensor<long> inputIdsTensor = new(inputIds, [1, inputIds.Length]);
         DenseTensor<long> attentionMaskTensor = new(attentionMask, [1, attentionMask.Length]);
         DenseTensor<long> decoderInputIdsTensor = new(decoderInputIds, [1, decoderInputIds.Length]);
@@ -109,7 +139,7 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
         int vocabSize = logits.Dimensions[2];
 
         if (batchSize != 1)
-            throw new NotSupportedException("Only batch size 1 is supported for this test runner.");
+            throw new NotSupportedException("Only batch size 1 is supported for this runner.");
 
         int lastTokenIndex = sequenceLength - 1;
 
@@ -148,6 +178,6 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
 
     public void Dispose()
     {
-        _session.Dispose();
+        _session?.Dispose();
     }
 }

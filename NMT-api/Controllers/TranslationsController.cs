@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using NMT_api.Contracts.Requests;
 using NMT_api.Contracts.Responses;
 using NMT_api.Services.Translation.Core;
@@ -9,6 +10,7 @@ using NMT_api.Services.Translation.Onnx;
 namespace NMT_api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/translations")]
 public sealed class TranslationsController : ControllerBase
 {
@@ -48,11 +50,15 @@ public sealed class TranslationsController : ControllerBase
         {
             Provider = info.Provider,
             ModelPath = info.ModelPath,
+            TokenizerPath = info.TokenizerPath,
+            Status = info.Status.ToString(),
             IsLoaded = info.IsLoaded,
+            IsRequired = info.IsRequired,
             LoadedAt = info.LoadedAt,
             StartupMs = info.StartupMs,
             InputNames = info.InputNames,
-            OutputNames = info.OutputNames
+            OutputNames = info.OutputNames,
+            Message = info.Message
         });
     }
 
@@ -77,6 +83,10 @@ public sealed class TranslationsController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { error = ex.Message });
+        }
+        catch (OnnxModelUnavailableException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = ex.Message });
         }
     }
 

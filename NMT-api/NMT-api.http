@@ -1,16 +1,21 @@
 @NMT_api_HostAddress = http://localhost:5114
 
-GET {{NMT_api_HostAddress}}/
+POST {{NMT_api_HostAddress}}/api/auth/token
 Accept: application/json
 
 ###
 
-GET {{NMT_api_HostAddress}}/health
+GET {{NMT_api_HostAddress}}/api/translations/languages
 Accept: application/json
 
 ###
 
-POST {{NMT_api_HostAddress}}/translate
+GET {{NMT_api_HostAddress}}/api/translations/onnx/model
+Accept: application/json
+
+###
+
+POST {{NMT_api_HostAddress}}/api/translations/text
 Content-Type: application/json
 
 {

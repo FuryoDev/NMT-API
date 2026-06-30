@@ -33,6 +33,10 @@
 			<CopyToPublishDirectory>Never</CopyToPublishDirectory>
 		</None>
 	</ItemGroup>
+	<ItemGroup>
+		<Content Remove="Models\**" />
+		<None Remove="Models\**" />
+	</ItemGroup>
 	<!--Default Part - End-->
 	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
@@ -45,9 +49,6 @@
 		<PackageReference Include="RTBF.Flow.Pacemaker.Logger" Version="2.0.1" />
 		<PackageReference Include="RTBF.Flow.Pacemaker.Register" Version="2.0.7" />
 		<PackageReference Include="Tokenizers.HuggingFace" Version="2.21.4" />
-	</ItemGroup>
-	<ItemGroup>
-	  <Folder Include="Models\Nllb\" />
 	</ItemGroup>
 
 </Project>

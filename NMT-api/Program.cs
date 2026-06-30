@@ -5,6 +5,7 @@ using Library_Authentication.Objects;
 using Library_Common;
 using Library_Common.SharedConnectors;
 using Library_Logger;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -22,6 +23,7 @@ using NMT_api.Services.Translation.Jobs;
 using NMT_api.Services.Translation.Language;
 using NMT_api.Services.Translation.Tokenization;
 using NMT_api.Services.Translation.Srt;
+using NMT_api.Services.Security;
 
 namespace NMT_api
 {
@@ -118,6 +120,9 @@ namespace NMT_api
                 _ = builder.Services.Configure<TranslationJobQueueOptions>(
                     builder.Configuration.GetSection("Translation:JobQueue")
                 );
+                _ = builder.Services.Configure<ApiTokenOptions>(
+                    builder.Configuration.GetSection("ApiToken")
+                );
 
                 // Register ONNX translation services
                 _ = builder.Services.AddSingleton<IOnnxNllbRunner, OnnxNllbRunner>();
@@ -130,6 +135,32 @@ namespace NMT_api
                 _ = builder.Services.AddScoped<INmtTranslationService, NmtTranslationService>();
                 _ = builder.Services.AddHostedService<OnnxModelWarmupHostedService>();
                 _ = builder.Services.AddHostedService<TranslationJobWorker>();
+                _ = builder.Services
+                    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                    .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+                    {
+                        ApiTokenOptions tokenOptions = builder.Configuration
+                            .GetSection("ApiToken")
+                            .Get<ApiTokenOptions>() ?? new ApiTokenOptions();
+
+                        options.Cookie.Name = tokenOptions.CookieName;
+                        options.Cookie.HttpOnly = true;
+                        options.Cookie.SameSite = SameSiteMode.Lax;
+                        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                        options.ExpireTimeSpan = TimeSpan.FromMinutes(tokenOptions.ExpirationMinutes);
+                        options.SlidingExpiration = false;
+                        options.Events.OnRedirectToLogin = context =>
+                        {
+                            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                            return Task.CompletedTask;
+                        };
+                        options.Events.OnRedirectToAccessDenied = context =>
+                        {
+                            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                            return Task.CompletedTask;
+                        };
+                    });
+                _ = builder.Services.AddAuthorization();
 
                 // Tell .NET to scan the controllers, routes, and DTOs to build the internal "map" of the API
                 //  - Provide the metadata for Scalar
@@ -216,11 +247,7 @@ namespace NMT_api
                     _ = builder.Services.AddRateLimiter(Library_Authentication.Getter.SetRateLimiterOptions);
                     _ = builder.Services.AddSingleton<Library_Authentication.Connectors.JWTSecurityToken.Interface, Library_Authentication.Connectors.JWTSecurityToken.Generator>();
                 }
-                // Disable Security
-                else
-                {
-                    Library_Authentication.Getter.DisableSecurity(builder.Services);
-                }
+                // Lightweight API token security is registered independently above.
 
                 // Add Swagger
                 _ = builder.Services.AddSwaggerGen(options =>
@@ -314,9 +341,9 @@ namespace NMT_api
                 });
 
                 // Security (The Guards)
+                _ = app.UseAuthentication();
                 if (enableSecurity)
                 {
-                    _ = app.UseAuthentication();
                     _ = app.UseRateLimiter();
                 }
                 _ = app.UseAuthorization(); // Required outside the 'if' in order to use the [Authorize] decorations
