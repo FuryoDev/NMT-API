@@ -1,0 +1,172 @@
+# =====================================
+# ===== .NET / C# =====================
+# =====================================
+
+# Build
+bin/
+obj/
+out/
+
+# User / IDE
+.vs/
+.idea/
+.fleet/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+artifacts/
+
+# Runtime / publish
+*.runtimeconfig.dev.json
+publish/
+*.pubxml.user
+
+# Tests
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# =====================================
+# ===== Python ========================
+# =====================================
+
+# Virtual env (IMPORTANT)
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs / temp
+*.log
+*.tmp
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python tools
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# =====================================
+# ===== Python backend spécifique =====
+# =====================================
+
+# Si ton dossier s'appelle EXACTEMENT comme ça
+python backend/venv/
+
+# (optionnel) si tu génères des fichiers
+python backend/output/
+python backend/temp/
+
+# =====================================
+# ===== Secrets / config ==============
+# =====================================
+
+# .NET
+appsettings.Development.json
+appsettings.Staging.json
+appsettings.Production.json
+appsettings.Local.json
+appsettings.*.local.json
+secrets.json
+Properties/ServiceDependencies/
+Properties/PublishProfiles/*.pubxml
+Properties/PublishProfiles/*.pubxml.user
+Properties/launchSettings.json
+NMT-api/Properties/launchSettings.json
+
+# Python
+.env
+.env.*
+!.env.example
+
+# Credentials / certificates / keys
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+*_rsa
+*_dsa
+*.kdbx
+
+# Local HTTP scratch files may contain bearer tokens or internal hosts
+*.http.local
+*.rest.local
+
+# =====================================
+# ===== ML models / local artifacts ===
+# =====================================
+
+# Models are deployment artifacts, not source code.
+# Keep them in an artifact repository or mounted volume and configure
+# NllbOnnx:ModelPath / NllbOnnx:TokenizerPath per environment.
+NMT-api/Models/Nllb/
+NMT-api/Models/**/*.onnx
+NMT-api/Models/**/*.bin
+NMT-api/Models/**/*.safetensors
+NMT-api/Models/**/*.pt
+NMT-api/Models/**/*.pth
+NMT-api/Models/**/*.ckpt
+NMT-api/Models/**/*.weight
+NMT-api/Models/**/tokenizer*.json
+NMT-api/Models/**/special_tokens_map.json
+
+# =====================================
+# ===== Docker / infra ===============
+# =====================================
+
+# Override local uniquement
+docker-compose.override.yml
+
+# =====================================
+# ===== Misc ==========================
+# =====================================
+
+*.cache
+*.temp
