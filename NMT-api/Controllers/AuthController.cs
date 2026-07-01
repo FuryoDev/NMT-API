@@ -1,6 +1,3 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -13,54 +10,49 @@ namespace NMT_api.Controllers;
 [Route("api/auth")]
 public sealed class AuthController : ControllerBase
 {
+    private readonly IApiTokenService _apiTokenService;
     private readonly ApiTokenOptions _options;
 
-    public AuthController(IOptions<ApiTokenOptions> options)
+    public AuthController(
+        IApiTokenService apiTokenService,
+        IOptions<ApiTokenOptions> options)
     {
+        _apiTokenService = apiTokenService;
         _options = options.Value;
     }
 
     [AllowAnonymous]
     [HttpPost("token")]
-    public async Task<ActionResult<ApiTokenResponse>> CreateToken()
+    public ActionResult<ApiTokenResponse> CreateToken()
     {
-        DateTimeOffset issuedAt = DateTimeOffset.UtcNow;
-        DateTimeOffset expiresAt = issuedAt.AddMinutes(_options.ExpirationMinutes);
-
-        ClaimsIdentity identity = new(
-            [
-                new Claim(ClaimTypes.NameIdentifier, "nmt-api-user"),
-                new Claim(ClaimTypes.Name, "NMT API User"),
-                new Claim("issued_at", issuedAt.ToUnixTimeSeconds().ToString())
-            ],
-            CookieAuthenticationDefaults.AuthenticationScheme);
-
-        AuthenticationProperties properties = new()
+        ApiTokenIssueResult token = _apiTokenService.Issue();
+        Response.Cookies.Append(_options.CookieName, token.Token, new CookieOptions
         {
-            IsPersistent = false,
-            IssuedUtc = issuedAt,
-            ExpiresUtc = expiresAt,
-            AllowRefresh = false
-        };
-
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            new ClaimsPrincipal(identity),
-            properties);
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = Request.IsHttps,
+            Expires = token.ExpiresAt,
+            IsEssential = true,
+            Path = "/"
+        });
 
         return Ok(new ApiTokenResponse
         {
-            ExpiresAt = expiresAt,
-            ExpiresInSeconds = (int)Math.Round((expiresAt - issuedAt).TotalSeconds),
-            Message = "Authentication cookie issued. Subsequent same-origin API calls are authenticated automatically until expiration."
+            ExpiresAt = token.ExpiresAt,
+            ExpiresInSeconds = token.ExpiresInSeconds,
+            Message = "API token cookie issued. Same-origin API calls are authenticated automatically until expiration."
         });
     }
 
-    [Authorize]
+    [AllowAnonymous]
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public IActionResult Logout()
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        Response.Cookies.Delete(_options.CookieName, new CookieOptions
+        {
+            Path = "/"
+        });
+
         return NoContent();
     }
 }

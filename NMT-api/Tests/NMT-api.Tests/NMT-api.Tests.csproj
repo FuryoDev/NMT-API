@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>annotations</Nullable>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+		<Compile Include="..\..\Services\Translation\Language\ITranslationLanguageService.cs" Link="Sources\ITranslationLanguageService.cs" />
+		<Compile Include="..\..\Services\Translation\Language\SupportedLanguage.cs" Link="Sources\SupportedLanguage.cs" />
+		<Compile Include="..\..\Services\Translation\Language\TranslationLanguageOptions.cs" Link="Sources\TranslationLanguageOptions.cs" />
+		<Compile Include="..\..\Services\Translation\Language\TranslationLanguageService.cs" Link="Sources\TranslationLanguageService.cs" />
+		<Compile Include="..\..\Services\Translation\Language\UnsupportedLanguageException.cs" Link="Sources\UnsupportedLanguageException.cs" />
+		<Compile Include="..\..\Services\Translation\Core\INmtTranslationService.cs" Link="Sources\INmtTranslationService.cs" />
+		<Compile Include="..\..\Services\Translation\Core\NmtTranslationService.cs" Link="Sources\NmtTranslationService.cs" />
+		<Compile Include="..\..\Services\Translation\Core\TranslationDefaultsOptions.cs" Link="Sources\TranslationDefaultsOptions.cs" />
+		<Compile Include="..\..\Services\Translation\Core\TranslationRequestOptions.cs" Link="Sources\TranslationRequestOptions.cs" />
+		<Compile Include="..\..\Services\Translation\Core\TranslationResult.cs" Link="Sources\TranslationResult.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\DecodingMode.cs" Link="Sources\DecodingMode.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\GreedyGenerationRequest.cs" Link="Sources\GreedyGenerationRequest.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\GreedyGenerationResult.cs" Link="Sources\GreedyGenerationResult.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\IOnnxNllbRunner.cs" Link="Sources\IOnnxNllbRunner.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\NllbOnnxOptions.cs" Link="Sources\NllbOnnxOptions.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\OnnxModelArtifactValidationResult.cs" Link="Sources\OnnxModelArtifactValidationResult.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\OnnxModelArtifactValidator.cs" Link="Sources\OnnxModelArtifactValidator.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\OnnxModelInfo.cs" Link="Sources\OnnxModelInfo.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\OnnxModelStatus.cs" Link="Sources\OnnxModelStatus.cs" />
+		<Compile Include="..\..\Services\Translation\Onnx\OnnxModelUnavailableException.cs" Link="Sources\OnnxModelUnavailableException.cs" />
+		<Compile Include="..\..\Services\Translation\Srt\ISrtService.cs" Link="Sources\ISrtService.cs" />
+		<Compile Include="..\..\Services\Translation\Srt\SrtBlock.cs" Link="Sources\SrtBlock.cs" />
+		<Compile Include="..\..\Services\Translation\Srt\SrtDocument.cs" Link="Sources\SrtDocument.cs" />
+		<Compile Include="..\..\Services\Translation\Srt\SrtService.cs" Link="Sources\SrtService.cs" />
+		<Compile Include="..\..\Services\Translation\Tokenization\INllbTokenizer.cs" Link="Sources\INllbTokenizer.cs" />
+		<Compile Include="..\..\Services\Translation\Tokenization\NllbTokenizerVocabulary.cs" Link="Sources\NllbTokenizerVocabulary.cs" />
+		<Compile Include="..\..\Services\Security\ApiTokenIssueResult.cs" Link="Sources\ApiTokenIssueResult.cs" />
+		<Compile Include="..\..\Services\Security\ApiTokenOptions.cs" Link="Sources\ApiTokenOptions.cs" />
+		<Compile Include="..\..\Services\Security\ApiTokenService.cs" Link="Sources\ApiTokenService.cs" />
+		<Compile Include="..\..\Services\Security\ApiTokenValidationResult.cs" Link="Sources\ApiTokenValidationResult.cs" />
+		<Compile Include="..\..\Services\Security\IApiTokenService.cs" Link="Sources\IApiTokenService.cs" />
+	</ItemGroup>
+
+</Project>

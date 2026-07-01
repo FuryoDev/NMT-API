@@ -56,6 +56,11 @@ public sealed class TranslationsController : ControllerBase
             IsRequired = info.IsRequired,
             LoadedAt = info.LoadedAt,
             StartupMs = info.StartupMs,
+            DecodingMode = info.DecodingMode.ToString(),
+            NumBeams = info.NumBeams,
+            LengthPenalty = info.LengthPenalty,
+            NoRepeatNgramSize = info.NoRepeatNgramSize,
+            RepetitionPenalty = info.RepetitionPenalty,
             InputNames = info.InputNames,
             OutputNames = info.OutputNames,
             Message = info.Message
@@ -87,6 +92,10 @@ public sealed class TranslationsController : ControllerBase
         catch (OnnxModelUnavailableException ex)
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = ex.Message });
+        }
+        catch (NotSupportedException ex)
+        {
+            return StatusCode(StatusCodes.Status501NotImplemented, new { error = ex.Message });
         }
     }
 

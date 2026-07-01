@@ -15,17 +15,19 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
     private readonly int _startupMs;
     private readonly OnnxModelStatus _status;
     private readonly string? _message;
+    private static readonly string[] RequiredInputNames = ["input_ids", "attention_mask", "decoder_input_ids"];
 
     public OnnxNllbRunner(IOptions<NllbOnnxOptions> options)
     {
         _options = options.Value;
-        _modelPath = ResolvePath(_options.ModelPath);
-        _tokenizerPath = ResolvePath(_options.TokenizerPath);
+        OnnxModelArtifactValidationResult artifactValidation = OnnxModelArtifactValidator.Validate(_options);
+        _modelPath = artifactValidation.ModelPath;
+        _tokenizerPath = artifactValidation.TokenizerPath;
 
-        if (!File.Exists(_modelPath))
+        if (!artifactValidation.IsValid)
         {
-            _status = OnnxModelStatus.Missing;
-            _message = $"The ONNX model file was not found: {_modelPath}";
+            _status = artifactValidation.Status;
+            _message = artifactValidation.Message;
             return;
         }
 
@@ -34,6 +36,16 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
             Stopwatch stopwatch = Stopwatch.StartNew();
             _session = new InferenceSession(_modelPath);
             stopwatch.Stop();
+
+            string? compatibilityError = ValidateModelCompatibility(_session);
+            if (compatibilityError is not null)
+            {
+                _session.Dispose();
+                _session = null;
+                _status = OnnxModelStatus.Failed;
+                _message = compatibilityError;
+                return;
+            }
 
             _loadedAt = DateTimeOffset.UtcNow;
             _startupMs = (int)stopwatch.ElapsedMilliseconds;
@@ -56,6 +68,11 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
         IsRequired: _options.ModelRequired,
         _loadedAt,
         _startupMs,
+        _options.DecodingMode,
+        _options.NumBeams,
+        _options.LengthPenalty,
+        _options.NoRepeatNgramSize,
+        _options.RepetitionPenalty,
         _session?.InputMetadata.Keys.Order().ToArray() ?? [],
         _session?.OutputMetadata.Keys.Order().ToArray() ?? [],
         _message);
@@ -65,6 +82,11 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
         if (_session is null)
         {
             throw new OnnxModelUnavailableException(_message ?? "ONNX model is not available.");
+        }
+
+        if (_options.DecodingMode == DecodingMode.BeamSearch)
+        {
+            throw new NotSupportedException("BeamSearch decoding is configured but not implemented yet. Use DecodingMode=Greedy until beam search is added to the ONNX runner.");
         }
 
         if (request.InputIds.Length == 0)
@@ -79,7 +101,7 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
         int maxNewTokens = request.MaxNewTokens ?? _options.MaxNewTokens;
 
         long eosTokenId = _options.EosTokenId;
-        long targetLanguageTokenId = request.TargetLanguageTokenId ?? _options.TargetLanguageTokenId;
+        long targetLanguageTokenId = request.TargetLanguageTokenId;
 
         List<long> decoderTokens = [eosTokenId];
 
@@ -132,6 +154,36 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
         return _session.Run(inputs);
     }
 
+    private static string? ValidateModelCompatibility(InferenceSession session)
+    {
+        string[] missingInputs = RequiredInputNames
+            .Where(inputName => !session.InputMetadata.ContainsKey(inputName))
+            .ToArray();
+
+        if (missingInputs.Length > 0)
+        {
+            return $"The ONNX model is not compatible with this runner. Missing input(s): {string.Join(", ", missingInputs)}. Expected inputs: {string.Join(", ", RequiredInputNames)}.";
+        }
+
+        if (session.OutputMetadata.Count == 0)
+        {
+            return "The ONNX model is not compatible with this runner. No output was found; expected logits output.";
+        }
+
+        NodeMetadata output = session.OutputMetadata.First().Value;
+        if (output.ElementType != typeof(float))
+        {
+            return $"The ONNX model output is not compatible with this runner. Expected float logits, got {output.ElementType.Name}.";
+        }
+
+        if (output.Dimensions.Length != 3)
+        {
+            return $"The ONNX model output is not compatible with this runner. Expected logits tensor rank 3 [batch, sequence, vocab], got rank {output.Dimensions.Length}.";
+        }
+
+        return null;
+    }
+
     private static long ArgMaxLastToken(Tensor<float> logits)
     {
         int batchSize = logits.Dimensions[0];
@@ -158,22 +210,6 @@ public class OnnxNllbRunner : IOnnxNllbRunner, IDisposable
         }
 
         return bestIndex;
-    }
-
-    private static string ResolvePath(string configuredPath)
-    {
-        if (Path.IsPathRooted(configuredPath))
-        {
-            return configuredPath;
-        }
-
-        string contentRootCandidate = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), configuredPath));
-        if (File.Exists(contentRootCandidate))
-        {
-            return contentRootCandidate;
-        }
-
-        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredPath));
     }
 
     public void Dispose()

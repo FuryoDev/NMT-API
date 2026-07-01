@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 using NMT_api.Services.Translation.Onnx;
-using System.Text.Json;
+using NMT_api.Services.Translation.Language;
 using Tokenizers.HuggingFace.Tokenizer;
 
 namespace NMT_api.Services.Translation.Tokenization;
@@ -9,12 +9,17 @@ public sealed class NllbTokenizer : INllbTokenizer, IDisposable
 {
     private readonly Tokenizer _tokenizer;
     private readonly IReadOnlyDictionary<string, long> _tokenIds;
+    private readonly long _eosTokenId;
 
-    public long EosTokenId => 2;
+    public long EosTokenId => _eosTokenId;
 
-    public NllbTokenizer(IOptions<NllbOnnxOptions> options)
+    public NllbTokenizer(
+        IOptions<NllbOnnxOptions> options,
+        ITranslationLanguageService languageService)
     {
-        string tokenizerPath = ResolvePath(options.Value.TokenizerPath);
+        NllbOnnxOptions nllbOptions = options.Value;
+        _eosTokenId = nllbOptions.EosTokenId;
+        string tokenizerPath = ResolvePath(nllbOptions.TokenizerPath);
 
         if (!File.Exists(tokenizerPath))
         {
@@ -22,7 +27,10 @@ public sealed class NllbTokenizer : INllbTokenizer, IDisposable
         }
 
         _tokenizer = Tokenizer.FromFile(tokenizerPath);
-        _tokenIds = LoadTokenIds(tokenizerPath);
+        _tokenIds = NllbTokenizerVocabulary.LoadTokenIds(tokenizerPath);
+        NllbTokenizerVocabulary.ValidateRequiredTokens(
+            _tokenIds,
+            languageService.GetSupportedLanguages().Select(language => language.NllbCode));
     }
 
     public long[] Encode(string text, string sourceLanguage)
@@ -56,58 +64,9 @@ public sealed class NllbTokenizer : INllbTokenizer, IDisposable
         return id;
     }
 
-    private static IReadOnlyDictionary<string, long> LoadTokenIds(string tokenizerPath)
-    {
-        Dictionary<string, long> tokenIds = new(StringComparer.Ordinal);
-
-        using FileStream stream = File.OpenRead(tokenizerPath);
-        using JsonDocument document = JsonDocument.Parse(stream);
-        JsonElement root = document.RootElement;
-
-        if (root.TryGetProperty("model", out JsonElement model)
-            && model.TryGetProperty("vocab", out JsonElement vocab)
-            && vocab.ValueKind == JsonValueKind.Object)
-        {
-            foreach (JsonProperty token in vocab.EnumerateObject())
-            {
-                tokenIds[token.Name] = token.Value.GetInt64();
-            }
-        }
-
-        if (root.TryGetProperty("added_tokens", out JsonElement addedTokens)
-            && addedTokens.ValueKind == JsonValueKind.Array)
-        {
-            foreach (JsonElement addedToken in addedTokens.EnumerateArray())
-            {
-                if (addedToken.TryGetProperty("content", out JsonElement content)
-                    && addedToken.TryGetProperty("id", out JsonElement tokenId))
-                {
-                    string? token = content.GetString();
-                    if (!string.IsNullOrEmpty(token))
-                    {
-                        tokenIds[token] = tokenId.GetInt64();
-                    }
-                }
-            }
-        }
-
-        return tokenIds;
-    }
-
     private static string ResolvePath(string configuredPath)
     {
-        if (Path.IsPathRooted(configuredPath))
-        {
-            return configuredPath;
-        }
-
-        string contentRootCandidate = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), configuredPath));
-        if (File.Exists(contentRootCandidate))
-        {
-            return contentRootCandidate;
-        }
-
-        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredPath));
+        return OnnxModelArtifactValidator.ResolvePath(configuredPath);
     }
 
     public void Dispose()

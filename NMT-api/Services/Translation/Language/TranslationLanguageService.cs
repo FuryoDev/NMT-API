@@ -5,6 +5,19 @@ namespace NMT_api.Services.Translation.Language;
 public sealed class TranslationLanguageService : ITranslationLanguageService
 {
     private readonly IReadOnlyDictionary<string, string> _languages;
+    private static readonly IReadOnlyDictionary<string, string> Aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["zh-cn"] = "zh-Hans",
+        ["zh-sg"] = "zh-Hans",
+        ["zh-hans"] = "zh-Hans",
+        ["zh-tw"] = "zh-Hant",
+        ["zh-hk"] = "zh-Hant",
+        ["zh-mo"] = "zh-Hant",
+        ["zh-hant"] = "zh-Hant",
+        ["no-no"] = "no",
+        ["nb-no"] = "nb",
+        ["nn-no"] = "nn"
+    };
 
     public TranslationLanguageService(IOptions<TranslationLanguageOptions> options)
     {
@@ -40,6 +53,13 @@ public sealed class TranslationLanguageService : ITranslationLanguageService
 
     private static string Normalize(string languageCode)
     {
-        return (languageCode ?? string.Empty).Trim().ToLowerInvariant();
+        string normalized = (languageCode ?? string.Empty)
+            .Trim()
+            .Replace('_', '-')
+            .ToLowerInvariant();
+
+        return Aliases.TryGetValue(normalized, out string? alias)
+            ? alias
+            : normalized;
     }
 }

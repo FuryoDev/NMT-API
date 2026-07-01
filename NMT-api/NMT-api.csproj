@@ -36,10 +36,12 @@
 	<ItemGroup>
 		<Content Remove="Models\**" />
 		<None Remove="Models\**" />
+		<Compile Remove="Tests\**" />
+		<Content Remove="Tests\**" />
+		<None Remove="Tests\**" />
 	</ItemGroup>
 	<!--Default Part - End-->
 	<ItemGroup>
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.5" />
@@ -48,6 +50,8 @@
 		<PackageReference Include="RTBF.Flow.Api.Authentication" Version="2.0.7" />
 		<PackageReference Include="RTBF.Flow.Pacemaker.Logger" Version="2.0.1" />
 		<PackageReference Include="RTBF.Flow.Pacemaker.Register" Version="2.0.7" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.5" />
+		<PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="10.1.5" />
 		<PackageReference Include="Tokenizers.HuggingFace" Version="2.21.4" />
 	</ItemGroup>
 

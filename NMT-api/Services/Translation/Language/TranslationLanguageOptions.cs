@@ -21,6 +21,8 @@ public sealed class TranslationLanguageOptions
         ["ko"] = "kor_Hang",
         ["nl"] = "nld_Latn",
         ["no"] = "nob_Latn",
+        ["nb"] = "nob_Latn",
+        ["nn"] = "nno_Latn",
         ["pl"] = "pol_Latn",
         ["pt"] = "por_Latn",
         ["ro"] = "ron_Latn",
@@ -29,6 +31,8 @@ public sealed class TranslationLanguageOptions
         ["sl"] = "slv_Latn",
         ["tr"] = "tur_Latn",
         ["uk"] = "ukr_Cyrl",
-        ["zh"] = "zho_Hans"
+        ["zh"] = "zho_Hans",
+        ["zh-Hans"] = "zho_Hans",
+        ["zh-Hant"] = "zho_Hant"
     };
 }

@@ -23,13 +23,5 @@ namespace NMT_api
             ];
             internal static readonly List<Storage> Storages = [];
         }
-        internal static class Security
-        {
-            internal static readonly string Issuer = Application.Name;
-            private static readonly string SecretKey_Application =
-                Environment.GetEnvironmentVariable("NMT_API_SECRET_KEY")
-                ?? throw new InvalidOperationException("Missing required environment variable: NMT_API_SECRET_KEY");
-            internal static readonly string SecretKey_Instance = SharedGetter.GetUniqueSecretKey(SecretKey_Application, Issuer);
-        }
     }
 }

@@ -5,10 +5,10 @@ using Library_Authentication.Objects;
 using Library_Common;
 using Library_Common.SharedConnectors;
 using Library_Logger;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.Hosting.Systemd;
 using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.OpenApi;
@@ -53,14 +53,8 @@ namespace NMT_api
                     options.Limits.MaxRequestBodySize = MaxRequestBodySizeBytes;
                 });
 
-                // Specify the URLs the hosted application will listen on (No args -> From appsettings.json/launchSettings.json)
-                
-                //bool enableSecurity = Config.Application.IsEndpointSecurized.Value;
-                bool enableSecurity = false;
-
                 if (FlowEnvironments.IsDevelopment(SharedConfig.Environment))
                 {
-                    enableSecurity = false;
                     _ = builder.WebHost.UseUrls();
                 }
                 else
@@ -88,7 +82,19 @@ namespace NMT_api
                 {
                     options.AllowEmptyInputInBodyModelBinding = true;
                     options.InputFormatters.Insert(0, new PlainTextInputFormatter());
-                }).AddJsonOptions(a =>
+                })
+                .ConfigureApplicationPartManager(manager =>
+                {
+                    ApplicationPart[] authenticationLibraryParts = manager.ApplicationParts
+                        .Where(part => string.Equals(part.Name, "Library_Authentication", StringComparison.OrdinalIgnoreCase))
+                        .ToArray();
+
+                    foreach (ApplicationPart part in authenticationLibraryParts)
+                    {
+                        _ = manager.ApplicationParts.Remove(part);
+                    }
+                })
+                .AddJsonOptions(a =>
                 {
                     a.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
                     a.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -135,31 +141,12 @@ namespace NMT_api
                 _ = builder.Services.AddScoped<INmtTranslationService, NmtTranslationService>();
                 _ = builder.Services.AddHostedService<OnnxModelWarmupHostedService>();
                 _ = builder.Services.AddHostedService<TranslationJobWorker>();
+                _ = builder.Services.AddSingleton<IApiTokenService, ApiTokenService>();
                 _ = builder.Services
-                    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-                    .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
-                    {
-                        ApiTokenOptions tokenOptions = builder.Configuration
-                            .GetSection("ApiToken")
-                            .Get<ApiTokenOptions>() ?? new ApiTokenOptions();
-
-                        options.Cookie.Name = tokenOptions.CookieName;
-                        options.Cookie.HttpOnly = true;
-                        options.Cookie.SameSite = SameSiteMode.Lax;
-                        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                        options.ExpireTimeSpan = TimeSpan.FromMinutes(tokenOptions.ExpirationMinutes);
-                        options.SlidingExpiration = false;
-                        options.Events.OnRedirectToLogin = context =>
-                        {
-                            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                            return Task.CompletedTask;
-                        };
-                        options.Events.OnRedirectToAccessDenied = context =>
-                        {
-                            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                            return Task.CompletedTask;
-                        };
-                    });
+                    .AddAuthentication(ApiTokenAuthenticationDefaults.AuthenticationScheme)
+                    .AddScheme<AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(
+                        ApiTokenAuthenticationDefaults.AuthenticationScheme,
+                        configureOptions: null);
                 _ = builder.Services.AddAuthorization();
 
                 // Tell .NET to scan the controllers, routes, and DTOs to build the internal "map" of the API
@@ -167,9 +154,6 @@ namespace NMT_api
                 //  - Not required for Swagger who made lot of guessing through Swashbuckle
                 _ = builder.Services.AddOpenApi("v1", options =>
                 {
-                    // Provide JWT auth info to OpenAPI documentation
-                    _ = options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
-
                     // Set OpenAPI info (Title, Versio, etc.) and order Controllers and Paths alphabetically
                     _ = options.AddDocumentTransformer((document, context, cancellationToken) =>
                     {
@@ -230,24 +214,11 @@ namespace NMT_api
                     _ = builder.Services.AddHostedService<BackgroundService_QueueBulkWorker_ApiHttpRequest>();
                 }
 
-                // Enable Security
-                Library_Authentication.Config.LoadProxiesInfo();
-
-                if (enableSecurity)
+                // Load proxy metadata only when cloud proxy handling needs it.
+                if (SharedGetter.IsCloud())
                 {
-                    if (!Config.Related.Databases.Any(d => d.Equals(SharedConfig.SQLServer.API.Database())))
-                    {
-                        Config.Related.Databases.Add(SharedConfig.SQLServer.API.Database());
-                    }
-
-                    Library_Authentication.Config.LoadAuthenticationInfo(Config.Security.Issuer, Config.Security.SecretKey_Instance);
-                    _ = builder.Services
-                        .AddAuthentication(Library_Authentication.Getter.SetAuthenticationOptions)
-                        .AddJwtBearer(Library_Authentication.Getter.SetJwtBearerOptions);
-                    _ = builder.Services.AddRateLimiter(Library_Authentication.Getter.SetRateLimiterOptions);
-                    _ = builder.Services.AddSingleton<Library_Authentication.Connectors.JWTSecurityToken.Interface, Library_Authentication.Connectors.JWTSecurityToken.Generator>();
+                    Library_Authentication.Config.LoadProxiesInfo();
                 }
-                // Lightweight API token security is registered independently above.
 
                 // Add Swagger
                 _ = builder.Services.AddSwaggerGen(options =>
@@ -266,13 +237,6 @@ namespace NMT_api
                             Email = "SolEtPro@rtbf.be"
                         }
                     });
-
-                    // Enable Security handling in Swagger
-                    if (enableSecurity)
-                    {
-                        options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, Library_Authentication.Getter.GetOpenApiSecurityScheme());
-                        options.AddSecurityRequirement((document) => new() { [new(JwtBearerDefaults.AuthenticationScheme, document)] = [] });
-                    }
                 });
 
                 // Proxy Handler - Configuration
@@ -342,10 +306,6 @@ namespace NMT_api
 
                 // Security (The Guards)
                 _ = app.UseAuthentication();
-                if (enableSecurity)
-                {
-                    _ = app.UseRateLimiter();
-                }
                 _ = app.UseAuthorization(); // Required outside the 'if' in order to use the [Authorize] decorations
                 #endregion
 
@@ -378,15 +338,7 @@ namespace NMT_api
                     _ = options
                         .EnableDarkMode()
                         .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
-                        .WithTitle($"{Config.Application.Name} ({SharedConfig.Environment} - {(SharedGetter.IsCloud() ? "Cloud" : "OnPrem")})")
-                        .AddPreferredSecuritySchemes(JwtBearerDefaults.AuthenticationScheme);
-
-                    // Enable Security handling in Scalar
-                    if (enableSecurity)
-                    {
-                        _ = options
-                            .AddPreferredSecuritySchemes(JwtBearerDefaults.AuthenticationScheme);
-                    }
+                        .WithTitle($"{Config.Application.Name} ({SharedConfig.Environment} - {(SharedGetter.IsCloud() ? "Cloud" : "OnPrem")})");
                 });
                 #endregion
 
@@ -395,13 +347,41 @@ namespace NMT_api
             }
             catch (Exception ex)
             {
-                Logger.LogException(ex, "Application terminated unexpectedly");
+                try
+                {
+                    Logger.LogException(ex, "Application terminated unexpectedly");
+                }
+                catch (Exception loggerException)
+                {
+                    Console.Error.WriteLine("Application terminated unexpectedly before the logger could write the exception.");
+                    Console.Error.WriteLine(ex);
+                    Console.Error.WriteLine("Logger failure:");
+                    Console.Error.WriteLine(loggerException);
+                }
+
                 throw;
             }
             finally
             {
-                Logger.LogApplicationInfo_Stop(SharedGetter.GetApplicationInfoLogs(Config.Application));
-                Logger.Close();
+                try
+                {
+                    Logger.LogApplicationInfo_Stop(SharedGetter.GetApplicationInfoLogs(Config.Application));
+                }
+                catch (Exception loggerException)
+                {
+                    Console.Error.WriteLine("Logger failed while writing application stop information.");
+                    Console.Error.WriteLine(loggerException);
+                }
+
+                try
+                {
+                    Logger.Close();
+                }
+                catch (Exception loggerException)
+                {
+                    Console.Error.WriteLine("Logger failed while closing.");
+                    Console.Error.WriteLine(loggerException);
+                }
             }
         }
     }

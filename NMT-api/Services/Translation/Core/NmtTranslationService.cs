@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NMT_api.Services.Translation.Language;
 using NMT_api.Services.Translation.Onnx;
@@ -9,18 +10,18 @@ namespace NMT_api.Services.Translation.Core;
 public sealed class NmtTranslationService : INmtTranslationService
 {
     private readonly IOnnxNllbRunner _runner;
-    private readonly INllbTokenizer _tokenizer;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ITranslationLanguageService _languageService;
     private readonly TranslationDefaultsOptions _defaults;
 
     public NmtTranslationService(
         IOnnxNllbRunner runner,
-        INllbTokenizer tokenizer,
+        IServiceProvider serviceProvider,
         ITranslationLanguageService languageService,
         IOptions<TranslationDefaultsOptions> defaults)
     {
         _runner = runner;
-        _tokenizer = tokenizer;
+        _serviceProvider = serviceProvider;
         _languageService = languageService;
         _defaults = defaults.Value;
     }
@@ -51,9 +52,24 @@ public sealed class NmtTranslationService : INmtTranslationService
         SupportedLanguage source = _languageService.Resolve(options.SourceLanguage);
         SupportedLanguage target = _languageService.Resolve(options.TargetLanguage);
 
-        long[] inputIds = _tokenizer.Encode(sourceText, source.NllbCode);
+        if (!_runner.ModelInfo.IsLoaded)
+        {
+            throw new OnnxModelUnavailableException(_runner.ModelInfo.Message ?? "ONNX model is not loaded.");
+        }
+
+        INllbTokenizer tokenizer;
+        try
+        {
+            tokenizer = _serviceProvider.GetRequiredService<INllbTokenizer>();
+        }
+        catch (Exception ex)
+        {
+            throw new OnnxModelUnavailableException($"Tokenizer is not available: {ex.Message}");
+        }
+
+        long[] inputIds = tokenizer.Encode(sourceText, source.NllbCode);
         long[] attentionMask = inputIds.Select(_ => 1L).ToArray();
-        long targetLanguageTokenId = _tokenizer.GetTokenId(target.NllbCode);
+        long targetLanguageTokenId = tokenizer.GetTokenId(target.NllbCode);
 
         Stopwatch stopwatch = Stopwatch.StartNew();
         GreedyGenerationResult generation = _runner.Generate(new GreedyGenerationRequest
@@ -67,7 +83,7 @@ public sealed class NmtTranslationService : INmtTranslationService
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        string translatedText = _tokenizer.Decode(generation.GeneratedTokenIds);
+        string translatedText = tokenizer.Decode(generation.GeneratedTokenIds);
 
         TranslationResult result = new(
             translatedText,
